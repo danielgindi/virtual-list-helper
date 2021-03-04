@@ -1,0 +1,6 @@
+.eslintignore
+.eslintrc.js
+.husky
+.idea
+README.md
+scripts/

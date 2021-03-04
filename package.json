@@ -1,0 +1,52 @@
+{
+  "name": "@danielgindi/virtual-list-helper",
+  "version": "1.0.0",
+  "description": "A collection of dom utilities. So you can work natively with the dom without dom frameworks.",
+  "main": "dist/virtual-list-helper.cjs.min.js",
+  "module": "lib/index.js",
+  "broswer": "dist/virtual-list-helper.umd.min.js",
+  "author": {
+    "name": "Daniel Cohen Gindi",
+    "email": "danielgindi@gmail.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/danielgindi/virtual-list-helper.git"
+  },
+  "directories": {
+    "dist": "dist",
+    "lib": "lib"
+  },
+  "scripts": {
+    "build": "npm run lint && node ./scripts/build.js",
+    "lint": "eslint .",
+    "lint-fix": "eslint . --fix",
+    "postinstall": "husky install",
+    "prepublishOnly": "pinst --disable && npm run build",
+    "postpublish": "pinst --enable"
+  },
+  "bugs": {
+    "url": "https://github.com/danielgindi/virtual-list-helper/issues"
+  },
+  "homepage": "https://github.com/danielgindi/virtual-list-helper#readme",
+  "license": "MIT",
+  "devDependencies": {
+    "@babel/core": "^7.12.10",
+    "@babel/preset-env": "^7.12.11",
+    "@babel/runtime": "^7.12.5",
+    "babelify": "^10.0.0",
+    "core-js": "^3.8.1",
+    "eslint": "^7.17.0",
+    "fs-extra": "^9.0.1",
+    "husky": "^5.1.3",
+    "pinst": "^2.1.4",
+    "rollup": "^2.35.1",
+    "rollup-plugin-babel": "^4.4.0",
+    "rollup-plugin-commonjs": "^10.1.0",
+    "rollup-plugin-node-resolve": "^5.2.0",
+    "rollup-plugin-terser": "^7.0.2"
+  },
+  "dependencies": {
+    "@danielgindi/dom-utils": "^1.0.0"
+  }
+}

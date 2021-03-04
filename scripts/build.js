@@ -133,7 +133,7 @@ const Path = require('path');
             },
             input: inputFile,
             plugins: plugins,
-            external: ['@danielgindi/dom-utils'],
+            external: /^@danielgindi\/dom-utils(\/|$)/,
         });
 
         let generated = await bundle.generate({
@@ -142,6 +142,7 @@ const Path = require('path');
             format: task.outputFormat,
             exports: task.outputExports,
             globals: {
+                '@danielgindi/dom-utils/lib/Css': 'domUtilsCss',
             },
         });
 

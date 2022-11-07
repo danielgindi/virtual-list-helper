@@ -1,6 +1,10 @@
+.idea
+scripts/
+tests/
 .eslintignore
 .eslintrc.js
-.husky
-.idea
-README.md
-scripts/
+.huskyrc
+.mocharc.yml
+.npmignore
+.husky/
+example/

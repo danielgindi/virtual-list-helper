@@ -31,20 +31,20 @@
   "homepage": "https://github.com/danielgindi/virtual-list-helper#readme",
   "license": "MIT",
   "devDependencies": {
-    "@babel/core": "^7.20.12",
-    "@babel/preset-env": "^7.20.2",
-    "@babel/runtime": "^7.20.13",
-    "@rollup/plugin-babel": "^6.0.3",
-    "@rollup/plugin-commonjs": "^24.0.1",
-    "@rollup/plugin-node-resolve": "^15.0.1",
-    "@rollup/plugin-terser": "^0.4.0",
-    "core-js": "^3.28.0",
-    "eslint": "^8.34.0",
+    "@babel/core": "^7.23.5",
+    "@babel/preset-env": "^7.23.5",
+    "@babel/runtime": "^7.23.5",
+    "@rollup/plugin-babel": "^6.0.4",
+    "@rollup/plugin-commonjs": "^25.0.7",
+    "@rollup/plugin-node-resolve": "^15.2.3",
+    "@rollup/plugin-terser": "^0.4.4",
+    "core-js": "^3.34.0",
+    "eslint": "^8.55.0",
     "eslint-formatter-codeframe": "^7.32.1",
-    "fs-extra": "^11.1.0",
+    "fs-extra": "^11.2.0",
     "husky": "^8.0.3",
     "pinst": "^3.0.0",
-    "rollup": "^3.15.0"
+    "rollup": "^4.8.0"
   },
   "dependencies": {
     "@danielgindi/dom-utils": "^1.0.8"

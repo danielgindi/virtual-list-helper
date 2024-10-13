@@ -5,6 +5,7 @@
   "main": "dist/virtual-list-helper.cjs.min.js",
   "module": "lib/index.js",
   "broswer": "dist/virtual-list-helper.umd.min.js",
+  "type": "module",
   "author": {
     "name": "Daniel Cohen Gindi",
     "email": "danielgindi@gmail.com"

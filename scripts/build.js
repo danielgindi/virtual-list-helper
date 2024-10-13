@@ -1,13 +1,19 @@
 /* eslint-disable no-console */
 
-const FsExtra = require('fs-extra');
-const Path = require('path');
+import Path from 'node:path';
+import { readFile, writeFile, rmdir, mkdir } from 'node:fs/promises';
+import { rollup } from 'rollup';
+import MagicString from 'magic-string';
+import { babel } from '@rollup/plugin-babel';
+import PluginTerser from '@rollup/plugin-terser';
+import { nodeResolve } from '@rollup/plugin-node-resolve';
+import PluginCommonjs from '@rollup/plugin-commonjs';
+import { fileURLToPath } from 'node:url';
 
 (async () => {
 
-    await FsExtra.emptyDir('./dist');
-
-    const Rollup = require('rollup');
+    await rmdir('./dist', { recursive: true });
+    await mkdir('./dist');
 
     const rollupTasks = [{
         dest: 'dist/virtual-list-helper.es6.js',
@@ -65,13 +71,13 @@ const Path = require('path');
         console.info('Generating ' + task.dest + '...');
 
         let plugins = [
-            require('@rollup/plugin-node-resolve').nodeResolve({
+            nodeResolve({
                 mainFields: ['module', 'main'],
             }),
-            require('@rollup/plugin-commonjs')({}),
+            PluginCommonjs({}),
         ];
 
-        const pkg = require('../package.json');
+        const pkg = JSON.parse(await readFile(Path.join(Path.dirname(fileURLToPath(import.meta.url)), '../package.json'), { encoding: 'utf8' }));
         const banner = [
             `/*!`,
             ` * ${pkg.name} ${pkg.version}`,
@@ -80,7 +86,7 @@ const Path = require('path');
         ].join('\n');
 
         if (task.babelTargets) {
-            plugins.push(require('@rollup/plugin-babel').babel({
+            plugins.push(babel({
                 sourceMap: !!task.sourceMap,
                 presets: [
                     ['@babel/env', {
@@ -99,7 +105,7 @@ const Path = require('path');
         }
 
         if (task.minified) {
-            plugins.push(require('@rollup/plugin-terser')({
+            plugins.push(PluginTerser({
                 toplevel: true,
                 compress: {
                     ecma: task.ecmaVersion,
@@ -114,7 +120,7 @@ const Path = require('path');
 
             renderChunk(code, chunk, _outputOptions = {}) {
 
-                const magicString = new (require('magic-string'))(code);
+                const magicString = new MagicString(code);
                 magicString.prepend(banner);
 
                 return {
@@ -126,7 +132,7 @@ const Path = require('path');
             },
         });
 
-        const bundle = await Rollup.rollup({
+        const bundle = await rollup({
             preserveSymlinks: true,
             treeshake: false,
             onwarn(warning, warn) {
@@ -144,7 +150,7 @@ const Path = require('path');
             format: task.outputFormat,
             exports: task.outputExports,
             globals: {
-                '@danielgindi/dom-utils/lib/Css': 'domUtilsCss',
+                '@danielgindi/dom-utils/lib/Css.js': 'domUtilsCss',
             },
         });
 
@@ -152,11 +158,11 @@ const Path = require('path');
 
         if (task.sourceMap === true && generated.output[0].map) {
             let sourceMapOutPath = task.dest + '.map';
-            FsExtra.writeFileSync(sourceMapOutPath, generated.output[0].map.toString());
+            await writeFile(sourceMapOutPath, generated.output[0].map.toString());
             code += '\n//# sourceMappingURL=' + Path.basename(sourceMapOutPath);
         }
 
-        FsExtra.writeFileSync(task.dest, code);
+        await writeFile(task.dest, code);
     }
 
     console.info('Done.');

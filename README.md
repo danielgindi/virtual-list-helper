@@ -12,6 +12,7 @@ A full featured dom virtual list
 ## Example
 
 The default exported class is `VirtualListHelper`, which does all the magic.  
+There is now also a Vue (v3) binding, in vue/VirtualList.vue.  
 I really hope to put in an example here soon. PRs are welcome.
 
 ## Api

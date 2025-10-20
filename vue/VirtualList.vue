@@ -8,7 +8,7 @@
 
 <script>
 import { defineComponent, ref, onMounted, onBeforeUnmount, render, createVNode, markRaw, nextTick, watch } from 'vue';
-import VirtualListHelper from '@danielgindi/virtual-list-helper';
+import VirtualListHelper from '../lib/index.js';
 
 const VueInstanceSymbol = Symbol('vue_instance');
 

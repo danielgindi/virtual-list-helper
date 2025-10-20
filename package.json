@@ -49,5 +49,13 @@
   },
   "dependencies": {
     "@danielgindi/dom-utils": "^1.0.11"
+  },
+  "peerDependencies": {
+    "vue": "^3.*"
+  },
+  "peerDependenciesMeta": {
+    "vue": {
+      "optional": true
+    }
   }
 }

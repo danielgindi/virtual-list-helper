@@ -1,6 +1,6 @@
 {
   "name": "@danielgindi/virtual-list-helper",
-  "version": "1.0.13",
+  "version": "1.0.14",
   "description": "A collection of dom utilities. So you can work natively with the dom without dom frameworks.",
   "main": "dist/virtual-list-helper.cjs.min.js",
   "module": "lib/index.js",

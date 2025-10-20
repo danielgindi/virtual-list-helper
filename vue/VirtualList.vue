@@ -90,7 +90,7 @@ export default defineComponent({
                 list: rootEl.value,
                 count: props.items ? props.items.length : props.count,
                 autoVirtualWrapperWidth: props.autoVirtualWrapperWidth,
-                //hookScrollEvent: props.hookScrollEvent,
+                hookScrollEvent: props.hookScrollEvent,
                 virtual: props.virtual,
                 estimatedItemHeight: props.estimatedItemHeight,
                 buffer: props.buffer,

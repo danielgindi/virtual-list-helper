@@ -39,19 +39,23 @@ export default defineComponent({
         // --- Rendering individual list items ---
         const onItemRender = (el, index) => {
             const data = { index: index };
-            if (props.items) {
+            if (props.items)
                 data.item = props.items[index];
-            }
+
+            // Always create fresh slot VNode
+            const slotVnode = slots.default?.(data);
+            if (!slotVnode) return;
 
             let vnode = el[VueInstanceSymbol];
             if (!vnode) {
-                let slotVnode = slots.default(data);
                 vnode = createVNode({
                     render() {
                         return slotVnode;
                     },
                 });
                 el[VueInstanceSymbol] = vnode;
+            } else {
+                vnode.type.render = () => slotVnode;
             }
 
             render(vnode, el);

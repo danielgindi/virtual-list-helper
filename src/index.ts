@@ -849,15 +849,15 @@ class VirtualListHelper {
     if (typeof index !== 'number' || index < 0 || index >= p.count)
       return undefined;
 
-    let height = p.cachedItemHeights[index - 1]; // already calculated
+    let height = p.cachedItemHeights[index]; // already calculated
 
     if (height === undefined) {
-      height = p.itemHeightEstimatorFn ? p.itemHeightEstimatorFn(index - 1) : null; // estimated per item
+      height = p.itemHeightEstimatorFn ? p.itemHeightEstimatorFn(index) : null; // estimated per item
 
       if (typeof height !== 'number')
         height = p.estimatedItemHeight; // estimated
 
-      p.cachedItemEstimatedHeights[index - 1] = height;
+      p.cachedItemEstimatedHeights[index] = height;
     }
 
     return height;

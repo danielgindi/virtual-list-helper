@@ -8,3 +8,6 @@ tests/
 .npmignore
 .husky/
 example/
+
+vitest.config.ts
+.github/

@@ -57,7 +57,7 @@ import { fileURLToPath } from 'node:url';
         minified: true,
         ecmaVersion: 2022,
     }, {
-        dest: 'dist/virtual-list-helper.cjs.js',
+        dest: 'dist/virtual-list-helper.cjs.cjs',
         sourceMap: true,
         outputFormat: 'cjs',
         outputExports: 'default',
@@ -66,7 +66,7 @@ import { fileURLToPath } from 'node:url';
         minified: false,
         ecmaVersion: 2022,
     }, {
-        dest: 'dist/virtual-list-helper.cjs.min.js',
+        dest: 'dist/virtual-list-helper.cjs.min.cjs',
         sourceMap: true,
         outputFormat: 'cjs',
         outputExports: 'default',

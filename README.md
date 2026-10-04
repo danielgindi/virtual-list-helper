@@ -87,6 +87,50 @@ Run `npm run build` to compile JavaScript and declarations into the existing
 Use `npm run typecheck` to check both the helper and Vue binding, or
 `npm run build:types` to generate their declarations only.
 
+## Tests
+
+Install dependencies and Chromium, then run the complete local check:
+
+```sh
+npm ci
+npx playwright install chromium
+npm test
+```
+
+`npm test` builds the package, runs Vitest, checks the test code, and checks
+strict consumers of the generated TypeScript declarations. The browser tests use
+real layout and scrolling rather than mocked element measurements.
+
+| Tests | Coverage |
+| --- | --- |
+| `tests/browser/core.test.ts` | Configuration, height estimates, viewport boundaries, buffers, variable and zero heights, scrolling and reuse, insert/remove/refresh, mode changes, callbacks, ghost items, and teardown |
+| `tests/browser/vue.test.ts` | Root attributes, slot data, reactive count/items/mode/width/height settings, scrolling, emitted height changes, public invalidation, and unmounting |
+| `tests/browser/dist.test.ts` | Generated JavaScript entry and both ESM bundles with real rendering and scrolling |
+| `tests/package/package.test.ts` | All six bundle banners/maps, UMD and CommonJS script exports, the real ESM dependency, and published runtime/type files |
+| `tests/types/public-api.ts` | Published callback types, optional lookup results, fluent methods, Vue props/events/methods, and rejected invalid consumer code |
+
+Focused commands are `npm run test:browser`, `npm run test:package`,
+`npm run test:types`, and `npm run test:watch`. Run `npm run build` before
+browser-only or watch runs, since they also exercise generated entries.
+
+Chromium is the default. To run more engines, install them with
+`npx playwright install chromium firefox webkit` and set `TEST_BROWSERS` to
+a comma-separated list. For example, in PowerShell:
+
+```powershell
+$env:TEST_BROWSERS = 'chromium,firefox,webkit'
+npm test
+```
+
+The GitHub Actions workflow runs all three engines on Linux.
+
+Regression tests cover constructor wrapper widths, requested item heights,
+empty and final viewport counts, cleanup after virtual-list invalidation,
+and Node loading of both CommonJS bundles. CommonJS output uses `.cjs` extensions.
+
+The Vue binding also emits a known warning about invoking item slots outside a
+render function; the Vue tests filter that specific warning and reject other warnings.
+
 ## Me
 * Hi! I am Daniel Cohen Gindi. Or in short- Daniel.
 * danielgindi@gmail.com is my email address.

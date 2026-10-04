@@ -873,9 +873,12 @@ class VirtualListHelper {
     let visibleHeight = list.clientHeight;
     let firstVisibleIndex, lastVisibleIndex;
 
+    if (p.count === 0 || visibleHeight === 0)
+      return 0;
+
     if (p.virtual) {
-      firstVisibleIndex = binarySearchPosition(p.cachedItemPositions, scrollTop);
-      lastVisibleIndex = binarySearchPosition(p.cachedItemPositions, scrollTop + visibleHeight, firstVisibleIndex);
+      firstVisibleIndex = binarySearchPosition(p.cachedItemPositions, scrollTop, 0, p.count - 1);
+      lastVisibleIndex = binarySearchPosition(p.cachedItemPositions, scrollTop + visibleHeight, firstVisibleIndex, p.count - 1);
     }
     else {
       const retriever = (i: number) => {
@@ -1316,7 +1319,7 @@ const binarySearchPosition = (positions: (number | undefined)[], pos: number, st
       end = mid - 1;
   }
 
-  return end === -1 ? 0 : (total - 1);
+  return end === -1 ? 0 : end;
 };
 
 /**
@@ -1346,7 +1349,7 @@ const binarySearchPositionByFn = (total: number, fn: (index: number) => number, 
       end = mid - 1;
   }
 
-  return end === -1 ? 0 : fn(total - 1);
+  return end === -1 ? 0 : end;
 };
 
 /**

@@ -941,7 +941,8 @@ class VirtualListHelper {
       let parent = el.parentNode;
       if (parent)
         parent.removeChild(el);
-      if (onItemUnrender && el[ItemIndexSymbol] !== undefined)
+      // Invalidation clears index metadata, but the element still owns rendered resources.
+      if (onItemUnrender)
         onItemUnrender(el);
     }
 

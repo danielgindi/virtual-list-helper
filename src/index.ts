@@ -58,8 +58,7 @@ interface VirtualListHelperState {
   count: number;
   virtual: boolean;
   userItemsParent: Element | null;
-  setVirtualWrapperWidth: boolean;
-  autoVirtualWrapperWidth?: boolean;
+  autoVirtualWrapperWidth: boolean;
   virtualWrapperWidthWasSet?: boolean;
   estimatedItemHeight: number;
   buffer: number;
@@ -128,7 +127,7 @@ class VirtualListHelper {
       count: opts.count || 0,
       virtual: opts.virtual === undefined ? true : !!opts.virtual,
       userItemsParent: opts.itemsParent || null,
-      setVirtualWrapperWidth: opts.autoVirtualWrapperWidth ?? true,
+      autoVirtualWrapperWidth: opts.autoVirtualWrapperWidth ?? true,
       estimatedItemHeight: 20,
       buffer: 5,
 
@@ -300,7 +299,7 @@ class VirtualListHelper {
     return this;
   }
 
-  isAutoVirtualWrapperWidth(): boolean | undefined {
+  isAutoVirtualWrapperWidth(): boolean {
     const p = this._p;
     return p.autoVirtualWrapperWidth;
   }

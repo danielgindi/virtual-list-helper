@@ -6,11 +6,17 @@
   />
 </template>
 
-<script>
+<script lang="ts">
 import { defineComponent, ref, onMounted, onBeforeUnmount, render, createVNode, markRaw, nextTick, watch } from 'vue';
+import type { ComponentOptions, PropType, VNode } from 'vue';
 import VirtualListHelper from '../lib/index.js';
+import type { ItemHeightEstimatorFunction, ItemElementCreatorFunction } from '../lib/index.js';
 
 const VueInstanceSymbol = Symbol('vue_instance');
+
+interface ItemElement extends Element {
+    [VueInstanceSymbol]?: VNode;
+}
 
 export default defineComponent({
     name: 'VirtualList',
@@ -24,27 +30,28 @@ export default defineComponent({
         virtual: { type: Boolean, default: true },
         estimatedItemHeight: { type: Number, default: 20 },
         buffer: { type: Number, default: 5 },
-        itemHeightEstimatorFn: { type: Function, default: null },
-        itemElementCreatorFn: { type: Function, default: null },
+        itemHeightEstimatorFn: { type: Function as PropType<ItemHeightEstimatorFunction>, default: null },
+        itemElementCreatorFn: { type: Function as PropType<ItemElementCreatorFunction>, default: null },
     },
 
     emits: ['scrollHeightChange'],
 
     setup(props, { slots, attrs, emit }) {
-        const rootEl = ref(null);
-        let helper = null;
+        const rootEl = ref<HTMLElement | null>(null);
+        let helper: VirtualListHelper | null = null;
         let isRenderScheduled = false;
         let isInvalidateScheduled = false;
 
         // --- Rendering individual list items ---
-        const onItemRender = (el, index) => {
-            const data = { index: index };
+        const onItemRender = (el: ItemElement, index: number) => {
+            const data: { index: number; item?: unknown } = { index: index };
             if (props.items)
                 data.item = props.items[index];
 
             // Always create fresh slot VNode
             const slotVnode = slots.default?.(data);
-            if (!slotVnode) return;
+            if (!slotVnode)
+                return;
 
             let vnode = el[VueInstanceSymbol];
             if (!vnode) {
@@ -55,21 +62,23 @@ export default defineComponent({
                 });
                 el[VueInstanceSymbol] = vnode;
             } else {
-                vnode.type.render = () => slotVnode;
+                (vnode.type as ComponentOptions).render = () => slotVnode;
             }
 
             render(vnode, el);
         };
 
-        const onItemUnrender = (el) => {
+        const onItemUnrender = (el: ItemElement) => {
             const app = el[VueInstanceSymbol];
-            if (!app) return;
+            if (!app)
+                return;
             render(null, el);
         };
 
         // --- Scheduling helpers ---
         const scheduleInvalidate = () => {
-            if (isInvalidateScheduled) return;
+            if (isInvalidateScheduled)
+                return;
             isInvalidateScheduled = true;
             nextTick(() => {
                 isInvalidateScheduled = false;
@@ -78,7 +87,8 @@ export default defineComponent({
         };
 
         const scheduleRender = () => {
-            if (isRenderScheduled) return;
+            if (isRenderScheduled)
+                return;
             isRenderScheduled = true;
             nextTick(() => {
                 isRenderScheduled = false;
@@ -88,7 +98,8 @@ export default defineComponent({
 
         // --- Lifecycle hooks ---
         onMounted(() => {
-            if (!rootEl.value) return;
+            if (!rootEl.value)
+                return;
 
             helper = markRaw(new VirtualListHelper({
                 list: rootEl.value,

@@ -1,3 +1,11 @@
 .idea
 node_modules
 dist/
+
+lib/
+vue/index.js
+vue/index.js.map
+vue/index.d.ts
+vue/index.d.ts.map
+vue/VirtualList.vue.d.ts
+vue/VirtualList.vue.d.ts.map

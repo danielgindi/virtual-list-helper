@@ -79,6 +79,14 @@ I really hope to put in an example here soon. PRs are welcome.
 
 This class' api is pretty much self explanatory, but I'll try to find the time to document it properly and add examples.
 
+## Development
+
+The helper source is in `src/index.ts`, with a TypeScript Vue binding in `vue/`.
+Run `npm run build` to compile JavaScript and declarations into the existing
+`lib/` and `vue/` entry paths and generate the ESM, UMD, and CommonJS bundles in `dist/`.
+Use `npm run typecheck` to check both the helper and Vue binding, or
+`npm run build:types` to generate their declarations only.
+
 ## Me
 * Hi! I am Daniel Cohen Gindi. Or in short- Daniel.
 * danielgindi@gmail.com is my email address.

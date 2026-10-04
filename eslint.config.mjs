@@ -1,3 +1,5 @@
+import tsPlugin from "@typescript-eslint/eslint-plugin";
+import tsParser from "@typescript-eslint/parser";
 import globals from "globals";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -23,6 +25,7 @@ export default [{
         "!tests/**/*_helpers.js",
         "!test/**/*_helpers.js",
         "dist/**/*",
+        "lib/**/*",
         "example/**/*",
     ],
 },
@@ -127,6 +130,19 @@ export default [{
                 ...Object.fromEntries(Object.entries(globals.browser).map(([key]) => [key, "off"])),
                 ...globals.node,
             },
+        },
+    },
+    {
+        files: ["**/*.ts"],
+        languageOptions: { parser: tsParser },
+        plugins: { "@typescript-eslint": tsPlugin },
+        rules: {
+            "no-undef": "off",
+            "no-unused-vars": "off",
+            "@typescript-eslint/no-unused-vars": ["warn", {
+                argsIgnorePattern: "^_",
+                varsIgnorePattern: "[iIgnored]|^_",
+            }],
         },
     },
 ];

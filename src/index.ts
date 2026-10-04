@@ -1,61 +1,97 @@
 import { getElementOffset } from '@danielgindi/dom-utils/lib/Css.js';
 
-/**
- * @typedef {function(index: number):(number|undefined)} VirtualListHelper~ItemHeightEstimatorFunction
- */
+export type ItemHeightEstimatorFunction = (index: number) => number | undefined;
+export type ItemElementCreatorFunction = () => Element;
+export type ItemRenderFunction = (itemEl: Element, index: number) => void;
+export type ItemUnrenderFunction = (itemEl: Element) => void;
+export type ScrollHeightChangeFunction = (height: number) => void;
 
-/**
- * @typedef {function():Element} VirtualListHelper~ItemElementCreatorFunction
- */
+export interface VirtualListHelperOptions {
+  /** The main element to operate inside of. */
+  list: Element;
 
-/**
- * @typedef {function(itemEl: Element, index: number)} VirtualListHelper~ItemRenderFunction
- */
+  /** The items parent; automatically created in virtual mode, uses the list by default in non-virtual mode. */
+  itemsParent?: Element | null;
 
-/**
- * @typedef {function(itemEl: Element)} VirtualListHelper~ItemUnrenderFunction
- */
+  /** Automatically set the virtual wrapper width. Defaults to true. */
+  autoVirtualWrapperWidth?: boolean;
 
-/**
- * @typedef {Object} VirtualListHelper~Options
- * @property {Element} list - the main element to operate inside of
- * @property {Element?} [itemsParent] - the element to use as parent for the items (automatically created in virtual mode, uses parent by default in non-virtual mode)
- * @property {boolean} [autoVirtualWrapperWidth=true] automatically set the width of the virtual wrapper
- * @property {boolean} [hookScrollEvent=true] automatically hook scroll event as needed
- * @property {number} [count=0] the item count
- * @property {boolean} [virtual=true] is virtual mode on?
- * @property {number} [estimatedItemHeight=20] estimated item height
- * @property {number} [buffer=5] the amount of buffer items to keep on each end of the list
- * @property {VirtualListHelper~ItemHeightEstimatorFunction} [itemHeightEstimatorFn] an optional function for providing item height estimations
- * @property {VirtualListHelper~ItemElementCreatorFunction} [itemElementCreatorFn] an optional function for providing fresh item elements (default creates `<li />`s)
- * @property {VirtualListHelper~ItemRenderFunction} [onItemRender] a function for rendering element content based on item index
- * @property {VirtualListHelper~ItemUnrenderFunction} [onItemUnrender] a function for freeing resources in an item element
- * @property {function(height: number)} [onScrollHeightChange] a function to be notified when scroll height changes
- *
- */
+  /** Automatically hook the scroll event as needed. Defaults to true. */
+  hookScrollEvent?: boolean;
 
-/** */
+  /** Item count. Defaults to 0. */
+  count?: number;
+
+  /** Enable virtual mode. Defaults to true. */
+  virtual?: boolean;
+
+  /** Estimated item height. Defaults to 20. */
+  estimatedItemHeight?: number;
+
+  /** Buffer items to keep on each end of the list. Defaults to 5. */
+  buffer?: number;
+
+  /** Optional per-item height estimates; return undefined to use the default estimate. */
+  itemHeightEstimatorFn?: ItemHeightEstimatorFunction | null;
+
+  /** Creates fresh item elements. Defaults to creating <li> elements. */
+  itemElementCreatorFn?: ItemElementCreatorFunction | null;
+
+  /** Render element content based on the item index. */
+  onItemRender?: ItemRenderFunction | null;
+
+  /** Free resources associated with an item element. */
+  onItemUnrender?: ItemUnrenderFunction | null;
+
+  /** Called when the scroll height changes. */
+  onScrollHeightChange?: ScrollHeightChangeFunction | null;
+}
+
+interface ItemElement extends Element {
+  [ItemIndexSymbol]?: number;
+  [ReuseElSymbol]?: boolean;
+}
+
+interface VirtualListHelperState {
+  list: Element | null;
+  hookScrollEvent: boolean;
+  count: number;
+  virtual: boolean;
+  userItemsParent: Element | null;
+  setVirtualWrapperWidth: boolean;
+  autoVirtualWrapperWidth?: boolean;
+  virtualWrapperWidthWasSet?: boolean;
+  estimatedItemHeight: number;
+  buffer: number;
+  itemHeightEstimatorFn: ItemHeightEstimatorFunction | null;
+  itemElementCreatorFn: ItemElementCreatorFunction;
+  onItemRender: ItemRenderFunction | null;
+  onItemUnrender: ItemUnrenderFunction | null;
+  onScrollHeightChange: ScrollHeightChangeFunction | null;
+  virtualWrapper: (Element & ElementCSSInlineStyle) | null;
+  currentItemsParent: Element | null;
+  cachedItemHeights: (number | undefined)[];
+  cachedItemEstimatedHeights: (number | undefined)[];
+  cachedItemPositions: (number | undefined)[];
+  itemPositionsNeedsUpdate: number;
+  boundRender: () => void;
+  existingEls: ItemElement[];
+}
 
 const hasOwnProperty = Object.prototype.hasOwnProperty;
 
 const hasInsertAdjacentElement = Element.prototype.insertAdjacentElement !== undefined;
 
-function insertBefore(el, before, parent) {
+function insertBefore(el: Element | DocumentFragment, before: Node | null | undefined, parent: Element) {
   if (!before)
     parent.appendChild(el);
   else if (hasInsertAdjacentElement === false || el instanceof DocumentFragment)
     parent.insertBefore(el, before);
-  else before.insertAdjacentElement('beforebegin', el);
+  else
+    (before as Element).insertAdjacentElement('beforebegin', el as Element);
 }
-/**
- *
- * @param {Element} itemEl
- * @param {DocumentFragment|null} fragment
- * @param {Node|undefined} before
- * @param {Element} itemParent
- * @returns {DocumentFragment|null}
- */
-function insertBeforeWithFragment(itemEl, fragment, before, itemParent) {
+
+function insertBeforeWithFragment(itemEl: Element, fragment: DocumentFragment | null, before: Node | null | undefined, itemParent: Element) {
   if (itemEl.parentNode !== itemParent) {
     if (!fragment)
       fragment = document.createDocumentFragment();
@@ -79,12 +115,12 @@ function insertBeforeWithFragment(itemEl, fragment, before, itemParent) {
 const DestroyedSymbol = Symbol('destroyed');
 
 class VirtualListHelper {
-  /**
-   * @param {VirtualListHelper~Options} opts
-   */
-  constructor(opts) {
-    /** @private */
-    const p = this._p = {
+  private declare _p: VirtualListHelperState;
+  private declare [DestroyedSymbol]?: boolean;
+
+  constructor(opts: VirtualListHelperOptions) {
+
+    const p: VirtualListHelperState = this._p = {
       // these come from options:
 
       list: opts.list || null,
@@ -96,45 +132,32 @@ class VirtualListHelper {
       estimatedItemHeight: 20,
       buffer: 5,
 
-      /** @type VirtualListHelper~ItemHeightEstimatorFunction|null */
       itemHeightEstimatorFn: null,
 
-      /** @type VirtualListHelper~ItemElementCreatorFunction|null */
       itemElementCreatorFn: defaultElementCreator,
 
-      /** @type VirtualListHelper~ItemRenderFunction|null */
       onItemRender: null,
 
-      /** @type VirtualListHelper~ItemUnrenderFunction|null */
       onItemUnrender: null,
 
-      /** @type {function(height: number)|null} */
       onScrollHeightChange: null,
 
       // internal:
 
-      /** @type Element|null */
       virtualWrapper: null,
 
-      /** @type Element|null */
       currentItemsParent: null,
 
-      /** @type {(number|undefined)[]} */
       cachedItemHeights: [],
 
-      /** @type {(number|undefined)[]} */
       cachedItemEstimatedHeights: [],
 
-      /** @type {(number|undefined)[]} */
       cachedItemPositions: [],
 
-      /** @type number */
       itemPositionsNeedsUpdate: 0,
 
-      /** @type function */
       boundRender: this.render.bind(this),
 
-      /** @type Element[] */
       existingEls: [],
     };
 
@@ -182,10 +205,8 @@ class VirtualListHelper {
 
   /**
    * Sets whether 'scroll' event on the list should be hooked automatically.
-   * @param {boolean} enabled
-   * @returns {VirtualListHelper}
    */
-  setHookScrollEvent(enabled) {
+  setHookScrollEvent(enabled?: boolean) {
     const p = this._p;
     enabled = enabled === undefined ? true : !!enabled;
 
@@ -199,9 +220,6 @@ class VirtualListHelper {
     return this;
   }
 
-  /**
-   * @returns {boolean} whether 'scroll' event on the list should be hooked automatically
-   */
   isHookScrollEventEnabled() {
     const p = this._p;
     return p.hookScrollEvent;
@@ -210,19 +228,14 @@ class VirtualListHelper {
   /**
    * Sets the list item count. <br />
    * You should probably call `render()` after this.
-   * @param {number} count
-   * @returns {VirtualListHelper}
    */
-  setCount(count) {
+  setCount(count: number) {
     const p = this._p;
     p.count = count;
 
     return this.invalidate();
   }
 
-  /**
-   * @returns {number} current item count
-   */
   getCount() {
     const p = this._p;
     return p.count;
@@ -232,10 +245,8 @@ class VirtualListHelper {
    * Switches between virtual and non-virtual mode. <br />
    * The list is invalidated automatically. <br />
    * You should call `render()` to update the view.
-   * @param {boolean} enabled
-   * @returns {VirtualListHelper}
    */
-  setVirtual(enabled) {
+  setVirtual(enabled?: boolean) {
     const p = this._p;
     enabled = enabled === undefined ? true : !!enabled;
 
@@ -249,32 +260,24 @@ class VirtualListHelper {
     return this;
   }
 
-  /**
-   * @returns {boolean} virtual mode
-   */
   isVirtual() {
     const p = this._p;
     return p.virtual;
   }
 
   /**
-   * Sets estimated item height. <br />
+   * Sets estimated item height to a positive number. <br />
    * No need to be accurate. <br />
    * The better the estimation - the better the scrollbar behavior will be. <br />
    * Applicable for virtual-mode only. <br />
    * You should `invalidate` if you want this to take effect on the existing rendering.
-   * @param {number} height - a positive number representing estimated item height.
-   * @returns {VirtualListHelper}
    */
-  setEstimatedItemHeight(height) {
+  setEstimatedItemHeight(height: number) {
     const p = this._p;
     p.estimatedItemHeight = Math.abs((typeof height === 'number' ? height : Number(height)) || 20);
     return this;
   }
 
-  /**
-   * @returns {number} current item height estimation
-   */
   getEstimatedItemHeight() {
     const p = this._p;
     return p.estimatedItemHeight;
@@ -282,10 +285,8 @@ class VirtualListHelper {
 
   /**
    * Sets whether the virtual wrapper width should be set automatically. <br />
-   * @param {boolean} enabled
-   * @returns {VirtualListHelper}
    */
-  setAutoVirtualWrapperWidth(enabled) {
+  setAutoVirtualWrapperWidth(enabled?: boolean) {
     const p = this._p;
     p.autoVirtualWrapperWidth = enabled === undefined ? true : !!enabled;
 
@@ -299,29 +300,22 @@ class VirtualListHelper {
     return this;
   }
 
-  /**
-   * @returns {boolean} whether the virtual wrapper width should be set automatically
-   */
-  isAutoVirtualWrapperWidth() {
+  isAutoVirtualWrapperWidth(): boolean | undefined {
     const p = this._p;
     return p.autoVirtualWrapperWidth;
   }
 
   /**
+   * The buffer is a positive count of items on each end.
    * Sets the amount of buffer items to keep on each end of the list. <br />
    * Applicable for virtual-mode only.
-   * @param {number} buffer - a positive value representing the count of buffer items for each end.
-   * @returns {VirtualListHelper}
    */
-  setBuffer(buffer) {
+  setBuffer(buffer: number) {
     const p = this._p;
     p.buffer = Math.abs(typeof buffer === 'number' ? buffer : (Number(buffer) || 5));
     return this;
   }
 
-  /**
-   * @returns {number} current buffer value
-   */
   getBuffer() {
     const p = this._p;
     return p.buffer;
@@ -332,10 +326,8 @@ class VirtualListHelper {
    * It's optional, and if it's present - it should return either a numeric height estimation,
    *   or `undefined` to fall back to the default estimation. <br />
    * You should `invalidate` if you want this to take effect on the existing rendering.
-   * @param {VirtualListHelper~ItemHeightEstimatorFunction} fn
-   * @returns {VirtualListHelper}
    */
-  setItemHeightEstimatorFn(fn) {
+  setItemHeightEstimatorFn(fn: ItemHeightEstimatorFunction | null) {
     const p = this._p;
     p.itemHeightEstimatorFn = fn;
     return this;
@@ -345,10 +337,8 @@ class VirtualListHelper {
    * The `itemElementCreatorFn` is a function creating a basic item element, that will be possibly reused later. <br />
    * It has no association with a specific item index. <br />
    * You should `invalidate` if you want this to take effect on the existing rendering.
-   * @param {VirtualListHelper~ItemElementCreatorFunction} fn
-   * @returns {VirtualListHelper}
    */
-  setItemElementCreatorFn(fn) {
+  setItemElementCreatorFn(fn: ItemElementCreatorFunction | null) {
     const p = this._p;
     p.itemElementCreatorFn = fn || defaultElementCreator;
     return this;
@@ -358,10 +348,8 @@ class VirtualListHelper {
    * The `onItemRender` is a function called for rendering the contents of an item. <br />
    * It's passed an `Element` and an item index. <br />
    * You should `invalidate` if you want this to take effect on the existing rendering.
-   * @param {VirtualListHelper~ItemRenderFunction} fn
-   * @returns {VirtualListHelper}
    */
-  setOnItemRender(fn) {
+  setOnItemRender(fn: ItemRenderFunction | null) {
     const p = this._p;
     p.onItemRender = fn;
     return this;
@@ -372,10 +360,8 @@ class VirtualListHelper {
    *   if you've attached something that needs to be explicitly freed. <br />
    * It's passed an `Element` only, and has no association with a specific index,
    *   as by the time it's called - the indexes are probably not valid anymore.
-   * @param {VirtualListHelper~ItemUnrenderFunction} fn
-   * @returns {VirtualListHelper}
    */
-  setOnItemUnrender(fn) {
+  setOnItemUnrender(fn: ItemUnrenderFunction | null) {
     const p = this._p;
     p.onItemUnrender = fn;
     return this;
@@ -383,10 +369,8 @@ class VirtualListHelper {
 
   /**
    * The `onScrollHeightChange` is a function called when the scroll height changes.
-   * @param {function(height: number)} fn
-   * @returns {VirtualListHelper}
    */
-  setOnScrollHeightChange(fn) {
+  setOnScrollHeightChange(fn: ScrollHeightChangeFunction | null) {
     const p = this._p;
     p.onScrollHeightChange = fn;
     return this;
@@ -394,7 +378,6 @@ class VirtualListHelper {
 
   /**
    * Estimates the full scroll height. This gets better as more renderings occur.
-   * @returns {number}
    */
   estimateFullHeight() {
     const p = this._p;
@@ -420,7 +403,6 @@ class VirtualListHelper {
    * States that the cached positions/heights are invalid,
    *   and needs to be completely re-calculated.<br />
    * You should probably call `render()` after this.
-   * @returns {VirtualListHelper}
    */
   invalidatePositions() {
     const p = this._p;
@@ -440,7 +422,6 @@ class VirtualListHelper {
    * States that the indexes/item count/rendered content are invalid,
    *   and needs to be completely re-calculated and re-rendered. <br />
    * You should probably call `render()` after this.
-   * @returns {VirtualListHelper}
    */
   invalidate() {
     const p = this._p;
@@ -484,7 +465,7 @@ class VirtualListHelper {
       const originalWidth = list.clientWidth;
 
       if (!virtualWrapper) {
-        virtualWrapper = p.virtualWrapper = p.userItemsParent;
+        virtualWrapper = p.virtualWrapper = p.userItemsParent as Element & ElementCSSInlineStyle;
         if (!virtualWrapper) {
           virtualWrapper = p.virtualWrapper = document.createElement('div');
           list.appendChild(virtualWrapper);
@@ -524,18 +505,17 @@ class VirtualListHelper {
       // we want to render until viewport's bottom + buffer items
       let maxIndexToRender = Math.max(index, binarySearchPosition(p.cachedItemPositions, visibleBottom - 1) + 1 + buffer);
 
-      let insertedItems = [];
+      let insertedItems: [ItemElement, number][] = [];
 
-      /** @type DocumentFragment|null */
-      let fragment = null;
+      let fragment: DocumentFragment | null = null;
 
       // Find the element to insert before
-      let before = virtualWrapper.childNodes[0];
+      let before: Node | null | undefined = virtualWrapper.childNodes[0];
 
-      const findElementToReuse = function (index) {
+      const findElementToReuse = function (index: number) {
         // Find existing element to reuse
-        /** @type Element|undefined */
-        let existingEl = undefined;
+
+        let existingEl: ItemElement | undefined = undefined;
 
         if (existingRange.firstIndex !== -1 && index >= existingRange.firstIndex && index <= existingRange.lastIndex) {
           existingEl = existingEls.find(x => x[ItemIndexSymbol] === index && x[ReuseElSymbol] === true);
@@ -618,10 +598,9 @@ class VirtualListHelper {
         }
 
         // Find the element to insert before
-        let before = itemParent.childNodes[0];
+        let before: Node | null | undefined = itemParent.childNodes[0];
 
-        /** @type DocumentFragment|null */
-        let fragment = null;
+        let fragment: DocumentFragment | null = null;
 
         for (let index = 0; index < count; index++) {
           // Find existing element to reuse
@@ -651,7 +630,8 @@ class VirtualListHelper {
     existingCount = existingEls.length; // May have changed
     for (let i = 0; i < existingCount; i++) {
       const el = existingEls[i];
-      if (el[ReuseElSymbol] !== true) continue;
+      if (el[ReuseElSymbol] !== true)
+        continue;
 
       let parent = el.parentNode;
       if (parent)
@@ -668,11 +648,8 @@ class VirtualListHelper {
   /**
    * States that items were added at a certain position in the list. <br />
    * Virtual mode: Call `render()` to update the view after making changes.
-   * @param {number} count
-   * @param {number} [atIndex=-1]
-   * @returns {VirtualListHelper}
    */
-  addItemsAt(count, atIndex = -1) {
+  addItemsAt(count: number, atIndex = -1) {
     if (typeof count !== 'number' || count <= 0)
       return this;
 
@@ -704,13 +681,11 @@ class VirtualListHelper {
 
       this._pushItemIndexesAt(atIndex, count);
 
-      /** @type Node|undefined */
-      let before = existingEls[startIndex - 1]
+      let before: Node | null | undefined = existingEls[startIndex - 1]
           ? existingEls[startIndex - 1].nextSibling
           : existingEls[0];
 
-      /** @type DocumentFragment|null */
-      let fragment = null;
+      let fragment: DocumentFragment | null = null;
 
       for (let index = atIndex, end = atIndex + count; index < end; index++) {
         const itemEl = this._dequeueElementForIndex(undefined, index, before, true);
@@ -729,11 +704,8 @@ class VirtualListHelper {
   /**
    * States that items were removed at a certain position in the list. <br />
    * Virtual mode: Call `render()` to update the view after making changes.
-   * @param {number} count
-   * @param {number} atIndex
-   * @returns {VirtualListHelper}
    */
-  removeItemsAt(count, atIndex) {
+  removeItemsAt(count: number, atIndex: number) {
     const p = this._p;
 
     if (typeof count !== 'number' || typeof atIndex !== 'number' || count <= 0 || atIndex < 0 || atIndex >= p.count)
@@ -779,10 +751,8 @@ class VirtualListHelper {
    * Mark an element for a re-render. <br />
    * Virtual mode: Call `render()` to update the view after making changes. <br />
    * Non-virtual mode - the element is re-rendered immediately.
-   * @param {number} index - the index of the element to re-render
-   * @returns {VirtualListHelper}
    */
-  refreshItemAt(index) {
+  refreshItemAt(index: number) {
     const p = this._p;
 
     if (typeof index !== 'number' || index < 0 || index >= p.count)
@@ -811,10 +781,8 @@ class VirtualListHelper {
 
   /**
    * Tests whether an item at the specified index is rendered.
-   * @param {number} index - the index to test
-   * @returns {boolean}
    */
-  isItemRendered(index) {
+  isItemRendered(index: number) {
     const p = this._p;
 
     if (typeof index !== 'number' || index < 0 || index >= p.count)
@@ -827,10 +795,8 @@ class VirtualListHelper {
 
   /**
    * Retrieves DOM element for the item at the specified index - if it's currently rendered.
-   * @param {number} index - the index to retrieve
-   * @returns {Element|undefined}
    */
-  getItemElementAt(index) {
+  getItemElementAt(index: number): Element | undefined {
     const p = this._p;
 
     if (typeof index !== 'number' || index < 0 || index >= p.count)
@@ -849,10 +815,8 @@ class VirtualListHelper {
   /**
    * Retrieves the position for the specified index. <br />
    * Can be used to scroll to a specific item.
-   * @param {number} index
-   * @returns {number|undefined}
    */
-  getItemPosition(index) {
+  getItemPosition(index: number): number | undefined {
     const p = this._p;
 
     if (typeof index !== 'number' || index < 0 || index >= p.count)
@@ -872,19 +836,15 @@ class VirtualListHelper {
 
   /**
    * Retrieves the item index for the specified element
-   * @param {Element} el
-   * @returns {number|undefined}
    */
-  getItemIndexFromElement(el) {
-    return el ? el[ItemIndexSymbol] : undefined;
+  getItemIndexFromElement(el: Element): number | undefined {
+    return el ? (el as ItemElement)[ItemIndexSymbol] : undefined;
   }
 
   /**
    * Retrieves the size (or estimated size, if unknown) for the specified index. <br />
-   * @param {number} index
-   * @returns {number|undefined}
    */
-  getItemSize(index) {
+  getItemSize(index: number): number | undefined {
     const p = this._p;
 
     if (typeof index !== 'number' || index < 0 || index >= p.count)
@@ -906,7 +866,6 @@ class VirtualListHelper {
 
   /**
    * Retrieves the number of items that fit into the current viewport.
-   * @returns {number}
    */
   getVisibleItemCount() {
     const p = this._p, list = p.list;
@@ -920,7 +879,7 @@ class VirtualListHelper {
       lastVisibleIndex = binarySearchPosition(p.cachedItemPositions, scrollTop + visibleHeight, firstVisibleIndex);
     }
     else {
-      const retriever = i => {
+      const retriever = (i: number) => {
         let pos = this.getItemPosition(i);
         if (pos === undefined)
           pos = Infinity;
@@ -937,12 +896,11 @@ class VirtualListHelper {
   }
 
   /**
+   * The ghost index is passed directly to the renderer. The tester is called synchronously.
+   * Appends the element to the DOM only when append is true.
    * Renders a temporary ghost item. Can be used for testings several aspects of a proposed element, i.e measurements.
-   * @param {*} ghostIndex - the value to pass as the index for the renderer function
-   * @param {boolean} append - whether to append the item element to the DOM
-   * @param {function(itemEl: Element)} ghostTester - the function that will receive the element, called synchronously.
    */
-  createGhostItemElement(ghostIndex, append, ghostTester) {
+  createGhostItemElement(ghostIndex: any, append: boolean, ghostTester: (itemEl: Element) => void) {
     const p = this._p;
 
     let itemEl = this._dequeueElementForIndex(null, ghostIndex, false, true);
@@ -964,19 +922,16 @@ class VirtualListHelper {
 
   /**
    * Reset the pointer to the current items wrapper
-   * @private
    */
-  _resetCurrentItemsParent() {
+  private _resetCurrentItemsParent() {
     const p = this._p;
     p.currentItemsParent = p.virtualWrapper ?? p.userItemsParent ?? p.list;
   }
 
   /**
    * Destroy all created elements, for cleanup
-   * @returns {VirtualListHelper}
-   * @private
    */
-  _destroyElements() {
+  private _destroyElements() {
     const p = this._p;
     const onItemUnrender = p.onItemUnrender;
     const existingEls = p.existingEls;
@@ -1009,11 +964,8 @@ class VirtualListHelper {
   /**
    * Marks (an) item(s) at specific index(es) as to be re-rendered. <br />
    * Applicable for virtual mode only.
-   * @param {number} index
-   * @param {number} count
-   * @private
    */
-  _invalidateItemIndexesAt(index, count) {
+  private _invalidateItemIndexesAt(index: number, count: number) {
     const p = this._p;
 
     this._setItemPositionsNeedsUpdate(index);
@@ -1042,11 +994,8 @@ class VirtualListHelper {
    * In/decrement the item-index marker for specific item(s). <br />
    * Used for inserting/removing items in the middle of the list, without re-rendering everything. <br />
    * Applicable for non-virtual mode only.
-   * @param {number} index
-   * @param {number} count
-   * @private
    */
-  _pushItemIndexesAt(index, count) {
+  private _pushItemIndexesAt(index: number, count: number) {
     const p = this._p;
 
     let existingEls = p.existingEls;
@@ -1067,16 +1016,14 @@ class VirtualListHelper {
 
   /**
    * Hook relevant events
-   * @returns {VirtualListHelper}
-   * @private
    */
-  _hookEvents() {
+  private _hookEvents() {
     const p = this._p;
 
     this._unhookEvents();
 
     if (p.virtual && p.hookScrollEvent) {
-      p.list && p.list.addEventListener('scroll', /**@type Function*/p.boundRender);
+      p.list && p.list.addEventListener('scroll', p.boundRender);
     }
 
     return this;
@@ -1084,13 +1031,11 @@ class VirtualListHelper {
 
   /**
    * Unhook previously hooked events
-   * @returns {VirtualListHelper}
-   * @private
    */
-  _unhookEvents() {
+  private _unhookEvents() {
     const p = this._p;
 
-    p.list && p.list.removeEventListener('scroll', /**@type Function*/p.boundRender);
+    p.list && p.list.removeEventListener('scroll', p.boundRender);
 
     return this;
   }
@@ -1098,10 +1043,8 @@ class VirtualListHelper {
   /**
    * Mark item index from which the positions are not considered valid anymore. <br />
    * Applicable for virtual mode only.
-   * @param {number} value
-   * @private
    */
-  _setItemPositionsNeedsUpdate(value) {
+  private _setItemPositionsNeedsUpdate(value: number) {
     const p = this._p;
 
     if (value < p.itemPositionsNeedsUpdate) {
@@ -1113,11 +1056,8 @@ class VirtualListHelper {
    * Calculates an item's top position (and stores in the private `cachedItemPositions` array). <br />
    * Allows calculating last+1 index too, to get the bottom-most position. <br />
    * Applicable for non-virtual mode only.
-   * @param {number} index
-   * @returns {number|undefined}
-   * @private
    */
-  _calculateItemPosition(index) {
+  private _calculateItemPosition(index: number) {
     const p = this._p;
 
     const cachedItemPositions = p.cachedItemPositions;
@@ -1193,14 +1133,8 @@ class VirtualListHelper {
    * Create (or reuse an existing) element for an item at the specified index,
    *   and insert physically at specified position. <br />
    * This will also update the element's position in the `existingEls` array.
-   * @param {Element|undefined} itemEl
-   * @param {number} index
-   * @param {Node|boolean|undefined} insertBefore
-   * @param {boolean|undefined} avoidDomReflow
-   * @returns {Element}
-   * @private
    */
-  _dequeueElementForIndex(itemEl, index, insertBefore, avoidDomReflow) {
+  private _dequeueElementForIndex(itemEl: ItemElement | null | undefined, index: number, insertBefore?: Node | boolean, avoidDomReflow?: boolean) {
     const p = this._p;
     const virtualWrapper = p.virtualWrapper;
     const itemParent = p.currentItemsParent;
@@ -1218,10 +1152,10 @@ class VirtualListHelper {
       itemEl = p.itemElementCreatorFn();
 
       if (virtualWrapper && insertBefore !== false) {
-        (/**@type ElementCSSInlineStyle*/itemEl).style.position = 'absolute';
-        (/**@type ElementCSSInlineStyle*/itemEl).style.top = '0';
-        (/**@type ElementCSSInlineStyle*/itemEl).style.left = '0';
-        (/**@type ElementCSSInlineStyle*/itemEl).style.right = '0';
+        (itemEl as Element & ElementCSSInlineStyle).style.position = 'absolute';
+        (itemEl as Element & ElementCSSInlineStyle).style.top = '0';
+        (itemEl as Element & ElementCSSInlineStyle).style.left = '0';
+        (itemEl as Element & ElementCSSInlineStyle).style.right = '0';
       }
     }
 
@@ -1246,7 +1180,7 @@ class VirtualListHelper {
       }
 
       // Insert into existing list
-      let beforeIndex = insertBefore ? existingEls.indexOf(/**@type Element*/insertBefore) : -1;
+      let beforeIndex = insertBefore ? existingEls.indexOf(insertBefore as ItemElement) : -1;
       if (beforeIndex === -1) {
         existingEls.push(itemEl);
       } else {
@@ -1266,12 +1200,8 @@ class VirtualListHelper {
 
   /**
    * Insert item element into the DOM, set it's flow in the DOM, and update the item's position. <br />
-   * @param {Element|undefined} itemEl
-   * @param {number} index
-   * @param {Node|boolean|undefined} before
-   * @private
    */
-  _insertItemAndFlow(itemEl, index, before) {
+  private _insertItemAndFlow(itemEl: ItemElement, index: number, before?: Node | boolean) {
     const p = this._p;
     const virtualWrapper = p.virtualWrapper;
     const itemParent = p.currentItemsParent;
@@ -1283,7 +1213,7 @@ class VirtualListHelper {
       // Insert into DOM
       if (itemEl.parentNode !== itemParent ||
           (itemEl.nextSibling !== before)) {
-        insertBefore(itemEl, before, itemParent);
+        insertBefore(itemEl, before as Node | null, itemParent);
       }
     }
 
@@ -1307,19 +1237,17 @@ class VirtualListHelper {
       const supportedTransform = getSupportedTransform();
 
       if (supportedTransform === false) {
-        (/**@type ElementCSSInlineStyle*/itemEl).style.top = `${pos}px`;
+        (itemEl as Element & ElementCSSInlineStyle).style.top = `${pos}px`;
       } else {
-        (/**@type ElementCSSInlineStyle*/itemEl).style[supportedTransform] = `translateY(${pos}px)`;
+        ((itemEl as Element & ElementCSSInlineStyle).style as CSSStyleDeclaration & Record<TransformProperty, string>)[supportedTransform] = `translateY(${pos}px)`;
       }
     }
   }
 
   /**
    * Fetches valid range of existingEls
-   * @returns {{firstIndex: (*|number), firstValidArrayIndex: number, lastValidArrayIndex: number, lastIndex: (*|number)}}
-   * @private
    */
-  _getExistingElsRange() {
+  private _getExistingElsRange() {
     const p = this._p, existingEls = p.existingEls;
 
     let firstValidArrayIndex = -1, lastValidArrayIndex = -1;
@@ -1350,15 +1278,12 @@ class VirtualListHelper {
   }
 }
 
-/** Marks the item index associated with an item element */
 const ItemIndexSymbol = Symbol('index');
 
-/** Marks an element for reuse */
 const ReuseElSymbol = Symbol('reuse');
 
 /**
  * The default element creator
- * @returns {HTMLLIElement}
  */
 const defaultElementCreator = () => {
   return document.createElement('li');
@@ -1366,17 +1291,13 @@ const defaultElementCreator = () => {
 
 /**
  * Will look for the index in the `positions` array closest to the specified `pos` value (<= pos).
- * @param {number[]} positions
- * @param {number} pos
- * @param {number} [start=0]
- * @param {number} [end=-1]
- * @returns {number}
  */
-const binarySearchPosition = (positions, pos, start = 0, end = -1) => {
+const binarySearchPosition = (positions: (number | undefined)[], pos: number, start = 0, end = -1) => {
   let total = positions.length;
   if (end < 0)
     end += total;
-  if (end <= start) return end; // 0 or 1 length array
+  if (end <= start)
+    return end; // 0 or 1 length array
 
   while (start <= end) {
     let mid = Math.floor(start + (end - start) / 2);
@@ -1401,17 +1322,12 @@ const binarySearchPosition = (positions, pos, start = 0, end = -1) => {
 /**
  * Will look for the index in a virtual list of positions supplied by `total` and `fn`,
  *   closest to the specified `pos` value (<= pos).
- * @param {number} total
- * @param {function(index: number):number} fn
- * @param {number} pos
- * @param {number} [start=0]
- * @param {number} [end=-1]
- * @returns {number}
  */
-const binarySearchPositionByFn = (total, fn, pos, start = 0, end = -1) => {
+const binarySearchPositionByFn = (total: number, fn: (index: number) => number, pos: number, start = 0, end = -1) => {
   if (end < 0)
     end += total;
-  if (end <= start) return end; // 0 or 1 length array
+  if (end <= start)
+    return end; // 0 or 1 length array
 
   while (start <= end) {
     let mid = Math.floor(start + (end - start) / 2);
@@ -1435,11 +1351,8 @@ const binarySearchPositionByFn = (total, fn, pos, start = 0, end = -1) => {
 
 /**
  * Finds the last item in the array for which `fn` returns a truthy value
- * @param {Array} array
- * @param {Function} fn
- * @returns {undefined|*}
  */
-const findLast = (array, fn) => {
+const findLast = <T>(array: T[], fn: (item: T) => unknown): T | undefined => {
   for (let i = array.length - 1; i >= 0; i--) {
     if (fn(array[i])) {
       return array[i];
@@ -1448,15 +1361,17 @@ const findLast = (array, fn) => {
   return undefined;
 };
 
-let _isTransformSupported = null;
+type TransformProperty = 'transform' | 'WebkitTransform' | 'MozTransform' | 'OTransform' | 'msTransform';
+
+let _isTransformSupported: TransformProperty | false | null = null;
 
 const getSupportedTransform = () => {
   if (_isTransformSupported === null) {
-    let prefixes = ['transform', 'WebkitTransform', 'MozTransform', 'OTransform', 'msTransform'];
+    let prefixes: TransformProperty[] = ['transform', 'WebkitTransform', 'MozTransform', 'OTransform', 'msTransform'];
     let div = document.createElement('div');
     _isTransformSupported = false;
     for (let item of prefixes) {
-      if (div && div.style[item] !== undefined) {
+      if (div && (div.style as CSSStyleDeclaration & Partial<Record<TransformProperty, string>>)[item] !== undefined) {
         _isTransformSupported = item;
         break;
       }

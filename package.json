@@ -23,7 +23,9 @@
     "lint": "eslint -f codeframe ./",
     "lint-fix": "eslint -f codeframe --fix ./",
     "prepublishOnly": "npm run build",
-    "prepare": "husky"
+    "prepare": "husky",
+    "build:types": "tsc --emitDeclarationOnly && vue-tsc --emitDeclarationOnly -p tsconfig.vue.json",
+    "typecheck": "tsc --emitDeclarationOnly && vue-tsc --noEmit -p tsconfig.vue.json"
   },
   "bugs": {
     "url": "https://github.com/danielgindi/virtual-list-helper/issues"
@@ -40,6 +42,8 @@
     "@rollup/plugin-commonjs": "^29.0.0",
     "@rollup/plugin-node-resolve": "^16.0.3",
     "@rollup/plugin-terser": "^0.4.4",
+    "@typescript-eslint/eslint-plugin": "^8.71.0",
+    "@typescript-eslint/parser": "^8.71.0",
     "core-js": "^3.48.0",
     "eslint": "^10.0.0",
     "eslint-formatter-codeframe": "^7.32.2",
@@ -47,7 +51,10 @@
     "globals": "^17.3.0",
     "husky": "^9.1.7",
     "pinst": "^3.0.0",
-    "rollup": "^4.57.1"
+    "rollup": "^4.57.1",
+    "typescript": "^5.9.3",
+    "vue": "^3.5.43",
+    "vue-tsc": "^3.3.12"
   },
   "dependencies": {
     "@danielgindi/dom-utils": "^1.0.11"
@@ -59,5 +66,6 @@
     "vue": {
       "optional": true
     }
-  }
+  },
+  "types": "lib/index.d.ts"
 }

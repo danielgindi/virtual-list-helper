@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "./vue",
+    "outDir": "./vue"
+  },
+  "include": [
+    "vue/**/*.ts",
+    "vue/**/*.vue"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
+}

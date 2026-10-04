@@ -1,7 +1,9 @@
 /* eslint-disable no-console */
 
 import Path from 'node:path';
-import { readFile, writeFile, rmdir, mkdir } from 'node:fs/promises';
+import ts from 'typescript';
+import { execFileSync } from 'node:child_process';
+import { readFile, writeFile, rm, mkdir } from 'node:fs/promises';
 import { rollup } from 'rollup';
 import MagicString from 'magic-string';
 import { babel } from '@rollup/plugin-babel';
@@ -12,8 +14,17 @@ import { fileURLToPath } from 'node:url';
 
 (async () => {
 
-    await rmdir('./dist', { recursive: true });
+    await rm('./dist', { recursive: true, force: true });
     await mkdir('./dist');
+
+    console.info('Compiling TypeScript and generating declarations...');
+    execFileSync(process.execPath, ['./node_modules/typescript/bin/tsc'], { stdio: 'inherit' });
+    execFileSync(process.execPath, ['./node_modules/vue-tsc/bin/vue-tsc.js', '--emitDeclarationOnly', '-p', 'tsconfig.vue.json'], { stdio: 'inherit' });
+
+    const vueEntry = await readFile('./vue/index.ts', 'utf8');
+    await writeFile('./vue/index.js', ts.transpileModule(vueEntry, {
+        compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext },
+    }).outputText);
 
     const rollupTasks = [{
         dest: 'dist/virtual-list-helper.es6.js',
@@ -136,7 +147,8 @@ import { fileURLToPath } from 'node:url';
             preserveSymlinks: true,
             treeshake: false,
             onwarn(warning, warn) {
-                if (warning.code === 'THIS_IS_UNDEFINED') return;
+                if (warning.code === 'THIS_IS_UNDEFINED')
+                    return;
                 warn(warning);
             },
             input: inputFile,

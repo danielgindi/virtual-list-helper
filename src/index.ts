@@ -710,9 +710,13 @@ class VirtualListHelper {
     if (typeof count !== 'number' || typeof atIndex !== 'number' || count <= 0 || atIndex < 0 || atIndex >= p.count)
       return this;
 
-    p.count -= Math.min(count, p.count - atIndex);
+    const removedCount = Math.min(count, p.count - atIndex);
+    p.count -= removedCount;
 
     if (p.virtual) {
+      p.cachedItemHeights.splice(atIndex, removedCount);
+      p.cachedItemEstimatedHeights.splice(atIndex, removedCount);
+      p.cachedItemPositions.splice(atIndex, removedCount);
       this._invalidateItemIndexesAt(atIndex, -1);
     }
     else { // non-virtual
@@ -980,8 +984,10 @@ class VirtualListHelper {
     if (existingRange.firstValidArrayIndex === -1)
       return;
 
-    if (count === -1)
+    if (count === -1) {
       count = existingEls.length;
+      index = Math.max(index, existingRange.firstIndex);
+    }
 
     // Clean
     if (index >= existingRange.firstIndex && index <= existingRange.lastIndex) {

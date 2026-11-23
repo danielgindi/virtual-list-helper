@@ -225,6 +225,43 @@ describe('mutations, modes, and resource cleanup', () => {
         expect([0, 1, 2, 3].map(index => helper.getItemElementAt(index)!.textContent)).toEqual(items);
     });
 
+    it('updates rendered indices when removing an item before the virtual viewport', () => {
+        const items = Array.from({ length: 30 }, (_, index) => `item-${index}`);
+        const { helper, list } = createFixture({
+            count: items.length,
+            onItemRender: (element, index) => { element.textContent = `${index}:${items[index]}`; },
+        });
+        helper.render();
+        list.scrollTop = 200;
+        helper.render();
+
+        const retainedElement = helper.getItemElementAt(11)!;
+        items.splice(0, 1);
+        helper.removeItemsAt(1, 0);
+
+        expect(helper.getItemIndexFromElement(retainedElement)).toBeUndefined();
+
+        helper.render();
+        expect(helper.getItemElementAt(10)!.textContent).toBe(`10:${items[10]}`);
+        expect(renderedIndices(helper, list).every(index => helper.getItemElementAt(index)!.textContent === `${index}:${items[index]}`)).toBe(true);
+    });
+
+    it('moves cached heights with items removed from a virtual list', () => {
+        const heights = [10, 30, 50];
+        const { helper } = createFixture({
+            count: heights.length,
+            itemHeightEstimatorFn: index => heights[index],
+            onItemRender: (element, index) => { (element as HTMLElement).style.height = `${heights[index]}px`; },
+        });
+        helper.render();
+
+        heights.splice(0, 1);
+        helper.removeItemsAt(1, 0);
+
+        expect(helper.getItemSize(0)).toBe(30);
+        expect(helper.getItemPosition(1)).toBe(30);
+    });
+
     it.each([true, false])('appends items and ignores invalid mutations (virtual=%s)', virtual => {
         const { helper } = createFixture({ count: 3, virtual });
         helper.render();

@@ -107,6 +107,7 @@ export default defineComponent({
                 autoVirtualWrapperWidth: props.autoVirtualWrapperWidth,
                 hookScrollEvent: props.hookScrollEvent,
                 virtual: props.virtual,
+                rerenderVirtualItemsAfterRemoval: true,
                 estimatedItemHeight: props.estimatedItemHeight,
                 buffer: props.buffer,
                 itemHeightEstimatorFn: props.itemHeightEstimatorFn,

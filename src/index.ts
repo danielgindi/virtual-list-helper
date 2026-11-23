@@ -25,6 +25,9 @@ export interface VirtualListHelperOptions {
   /** Enable virtual mode. Defaults to true. */
   virtual?: boolean;
 
+  /** Re-render visible items after a removal shifts their indexes in virtual mode. Defaults to false. */
+  rerenderVirtualItemsAfterRemoval?: boolean;
+
   /** Estimated item height. Defaults to 20. */
   estimatedItemHeight?: number;
 
@@ -57,6 +60,7 @@ interface VirtualListHelperState {
   hookScrollEvent: boolean;
   count: number;
   virtual: boolean;
+  rerenderVirtualItemsAfterRemoval: boolean;
   userItemsParent: Element | null;
   autoVirtualWrapperWidth: boolean;
   virtualWrapperWidthWasSet?: boolean;
@@ -126,6 +130,7 @@ class VirtualListHelper {
       hookScrollEvent: opts.hookScrollEvent === undefined ? true : !!opts.hookScrollEvent,
       count: opts.count || 0,
       virtual: opts.virtual === undefined ? true : !!opts.virtual,
+      rerenderVirtualItemsAfterRemoval: opts.rerenderVirtualItemsAfterRemoval === true,
       userItemsParent: opts.itemsParent || null,
       autoVirtualWrapperWidth: opts.autoVirtualWrapperWidth ?? true,
       estimatedItemHeight: 20,
@@ -635,7 +640,8 @@ class VirtualListHelper {
       let parent = el.parentNode;
       if (parent)
         parent.removeChild(el);
-      if (onItemUnrender && el[ItemIndexSymbol] !== undefined)
+      // Invalidated elements still own rendered resources.
+      if (onItemUnrender)
         onItemUnrender(el);
       existingEls.splice(i, 1);
 
@@ -717,7 +723,35 @@ class VirtualListHelper {
       p.cachedItemHeights.splice(atIndex, removedCount);
       p.cachedItemEstimatedHeights.splice(atIndex, removedCount);
       p.cachedItemPositions.splice(atIndex, removedCount);
-      this._invalidateItemIndexesAt(atIndex, -1);
+
+      if (p.rerenderVirtualItemsAfterRemoval) {
+        this._invalidateItemIndexesAt(atIndex, -1);
+      } else {
+        this._setItemPositionsNeedsUpdate(atIndex);
+        const existingEls = p.existingEls;
+        const onItemUnrender = p.onItemUnrender;
+
+        for (let i = existingEls.length - 1; i >= 0; i--) {
+          const itemEl = existingEls[i];
+          const index = itemEl[ItemIndexSymbol];
+
+          if (index !== undefined && index < atIndex)
+            continue;
+
+          if (index !== undefined && index >= atIndex + removedCount) {
+            itemEl[ItemIndexSymbol] = index - removedCount;
+            continue;
+          }
+
+          // Remove deleted items and elements whose indexes were already invalidated.
+          if (itemEl.parentNode)
+            itemEl.parentNode.removeChild(itemEl);
+          delete itemEl[ItemIndexSymbol];
+          if (onItemUnrender)
+            onItemUnrender(itemEl);
+          existingEls.splice(i, 1);
+        }
+      }
     }
     else { // non-virtual
       let existingEls = p.existingEls;

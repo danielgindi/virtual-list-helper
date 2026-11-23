@@ -83,6 +83,22 @@ describe('Vue binding', () => {
         expect(Array.from(list.children, element => element.textContent)).toEqual(['x', 'y', 'z']);
     });
 
+    it.each([true, false])('updates slot indexes after replacing items with a removal (virtual=%s)', async virtual => {
+        const items = ref(['a', 'b', 'c', 'd']);
+        const { container } = mount(() => h(VirtualList, {
+            style: listStyle,
+            virtual,
+            items: items.value,
+            buffer: 0,
+            itemElementCreatorFn: createItem,
+        }, { default: ({ index, item }: { index: number; item: unknown }) => h('span', `${index}:${item}`) }));
+
+        items.value = ['a', 'c', 'd'];
+        await flushRender();
+
+        expect(Array.from(container.querySelectorAll('span'), element => element.textContent)).toEqual(['0:a', '1:c', '2:d']);
+    });
+
     it('switches rendering mode and toggles wrapper width through reactive props', async () => {
         const virtual = ref(false);
         const autoWidth = ref(false);

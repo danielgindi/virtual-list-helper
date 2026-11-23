@@ -26,12 +26,15 @@ I really hope to put in an example here soon. PRs are welcome.
 | hookScrollEvent       | `boolean` | `true` | automatically hook scroll event as needed |
 | count                 | `number`  | `0` | the item count |
 | virtual               | `boolean` | `true` | is virtual mode on? |
+| rerenderVirtualItemsAfterRemoval | `boolean` | `false` | re-render visible virtual items whose indexes shift after `removeItemsAt()` |
 | estimatedItemHeight   | `number`  | `20` | estimated item height |
 | buffer                | `number`  | `5` | the amount of buffer items to keep on each end of the list |
 | itemHeightEstimatorFn | `ItemHeightEstimatorFunction` | | an optional function for providing item height estimations |
 | itemElementCreatorFn  | `ItemElementCreatorFunction`  | | an optional function for providing fresh item elements (default creates `<li />`s) |
 | onItemRender          | `ItemRenderFunction`          | | a function for rendering element content based on item index |
 | onItemUnrender        | `ItemUnrenderFunction`        | | a function for freeing resources in an item element |
+
+By default, `removeItemsAt()` in virtual mode keeps the rendered elements for items after the removal and shifts their index markers. Their `onItemRender` callbacks are not called again until another change requires rendering. Set `rerenderVirtualItemsAfterRemoval: true` if rendered content, event handlers, or resources depend on the item's index. The Vue binding uses this setting internally. This option has no effect in non-virtual mode.
 
 ---
 #### ItemHeightEstimatorFunction

@@ -27,6 +27,7 @@ const options: VirtualListHelperOptions = {
     list: document.createElement('div'),
     itemsParent: null,
     virtual: true,
+    rerenderVirtualItemsAfterRemoval: true,
     hookScrollEvent: false,
     autoVirtualWrapperWidth: true,
     count: 100,

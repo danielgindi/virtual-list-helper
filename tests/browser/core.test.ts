@@ -203,6 +203,91 @@ describe('virtual rendering and browser layout', () => {
 });
 
 describe('mutations, modes, and resource cleanup', () => {
+    it('preserves shifted virtual items by default after removal', () => {
+        const items = ['a', 'b', 'c', 'd'];
+        const onItemRender = vi.fn((element: Element, index: number) => { element.textContent = items[index]; });
+        const { helper, list, onItemUnrender } = createFixture({
+            count: items.length,
+            onItemRender,
+        });
+        helper.render();
+
+        const removedElement = helper.getItemElementAt(1)!;
+        const retainedElement = helper.getItemElementAt(2)!;
+        const renderCount = onItemRender.mock.calls.length;
+
+        items.splice(1, 1);
+        helper.removeItemsAt(1, 1).render();
+
+        expect(renderedIndices(helper, list)).toEqual([0, 1, 2]);
+        expect(helper.getItemElementAt(1)).toBe(retainedElement);
+        expect(retainedElement.textContent).toBe('c');
+        expect(onItemRender).toHaveBeenCalledTimes(renderCount);
+        expect(onItemUnrender).toHaveBeenCalledExactlyOnceWith(removedElement);
+        expect(helper.getItemIndexFromElement(removedElement)).toBeUndefined();
+    });
+
+    it.each([false, true])('cleans up a removed virtual item with a pending refresh (rerender=%s)', rerenderVirtualItemsAfterRemoval => {
+        const items = ['a', 'b', 'c'];
+        const { helper, onItemUnrender } = createFixture({
+            count: items.length,
+            rerenderVirtualItemsAfterRemoval,
+            onItemRender: (element, index) => { element.textContent = items[index]; },
+        });
+        helper.render();
+
+        const removedElement = helper.getItemElementAt(1)!;
+        helper.refreshItemAt(1);
+        items.splice(1, 1);
+        helper.removeItemsAt(1, 1);
+        expect(helper.getItemIndexFromElement(removedElement)).toBeUndefined();
+
+        helper.render();
+
+        expect(onItemUnrender.mock.calls.filter(([element]) => element === removedElement)).toHaveLength(1);
+        expect(helper.getItemElementAt(1)!.textContent).toBe('c');
+    });
+
+    it('re-renders shifted virtual items when requested', () => {
+        const items = ['a', 'b', 'c', 'd'];
+        const onItemRender = vi.fn((element: Element, index: number) => { element.textContent = `${index}:${items[index]}`; });
+        const { helper, list } = createFixture({
+            count: items.length,
+            rerenderVirtualItemsAfterRemoval: true,
+            onItemRender,
+        });
+        helper.render();
+        const renderCount = onItemRender.mock.calls.length;
+
+        items.splice(1, 1);
+        helper.removeItemsAt(1, 1).render();
+
+        expect(renderedIndices(helper, list)).toEqual([0, 1, 2]);
+        expect([0, 1, 2].map(index => helper.getItemElementAt(index)!.textContent)).toEqual(['0:a', '1:c', '2:d']);
+        expect(onItemRender.mock.calls.length).toBeGreaterThan(renderCount);
+    });
+
+    it.each([false, true])('ignores the virtual removal option in non-virtual mode (enabled=%s)', rerenderVirtualItemsAfterRemoval => {
+        const items = ['a', 'b', 'c', 'd'];
+        const onItemRender = vi.fn((element: Element, index: number) => { element.textContent = items[index]; });
+        const { helper } = createFixture({
+            count: items.length,
+            virtual: false,
+            rerenderVirtualItemsAfterRemoval,
+            onItemRender,
+        });
+        helper.render();
+        const retainedElement = helper.getItemElementAt(2)!;
+        const renderCount = onItemRender.mock.calls.length;
+
+        items.splice(1, 1);
+        helper.removeItemsAt(1, 1).render();
+
+        expect(helper.getItemElementAt(1)).toBe(retainedElement);
+        expect(retainedElement.textContent).toBe('c');
+        expect(onItemRender).toHaveBeenCalledTimes(renderCount);
+    });
+
     it.each([true, false])('adds and removes items in the middle (virtual=%s)', virtual => {
         const items = ['a', 'b', 'c', 'd'];
         const { helper, list } = createFixture({
@@ -229,6 +314,7 @@ describe('mutations, modes, and resource cleanup', () => {
         const items = Array.from({ length: 30 }, (_, index) => `item-${index}`);
         const { helper, list } = createFixture({
             count: items.length,
+            rerenderVirtualItemsAfterRemoval: true,
             onItemRender: (element, index) => { element.textContent = `${index}:${items[index]}`; },
         });
         helper.render();
